@@ -1,20 +1,17 @@
 import React from "react";
 import "./App.css";
-import { print } from "./print";
-
+import { HashRouter, Route, Switch } from "react-router-dom";
+import { print } from "./common/print";
+import ListPrint from "./components/list-print/index";
+import 'antd/dist/antd.css'
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <button
-          onClick={() => {
-            print();
-          }}
-        >
-          print
-        </button>
-      </header>
-    </div>
+    <HashRouter>
+      <Switch>
+        <Route path="/" exact component={ListPrint} />
+        {/* <Route path="/setting" exact sensitive component={Setting} /> */}
+      </Switch>
+    </HashRouter>
   );
 }
 

@@ -3,7 +3,17 @@ const app = electron.app;
 const BrowserWindow = electron.BrowserWindow;
 const path = require("path");
 const isDev = require("electron-is-dev");
-const { ipcMain, Tray, Menu, dialog, remote } = electron;
+const { ipcMain, Tray, Menu, dialog, remote, Notification } = electron;
+
+const showNotification = (config) => {
+  const { title = "print app", body = "from print app.." } = config;
+  const notification = {
+    title,
+    body,
+    ...config,
+  };
+  new Notification(notification).show();
+};
 
 let mainWindow;
 let printWindow;
@@ -12,15 +22,19 @@ let appIcon;
 let iconPath = path.join(__dirname, "logo192.png");
 
 function createWindow() {
+  showNotification({
+    title: "Print đang khởi chạy",
+    body: "Trong quá trình chạy...",
+  });
   let display = electron.screen.getPrimaryDisplay();
   let widthScreen = display.bounds.width;
   let heightScreen = display.bounds.height;
 
   mainWindow = new BrowserWindow({
-    width: 300,
-    height: 150,
-    x: widthScreen - 300,
-    y: heightScreen - 200, // heightScreen - 50
+    width: 800,
+    height: 800,
+    // x: widthScreen - 300,
+    // y: heightScreen - 200, // heightScreen - 50
     // show: false,
     // frame: false,
     fullscreenable: false,
@@ -38,6 +52,7 @@ function createWindow() {
       : `file://${path.join(__dirname, "../build/index.html")}`
   );
   mainWindow.on("closed", () => (mainWindow = null));
+  // mainWindow.hide();
 
   //print
   printWindow = new BrowserWindow({
@@ -80,7 +95,7 @@ function createWindow() {
   ]);
 
   appIcon = new Tray(iconPath);
-  appIcon.setToolTip("ACEXIS | ORC TOOLS");
+  appIcon.setToolTip("ACEXIS | Print");
   appIcon.setContextMenu(contextMenu);
 
   mainWindow.on("minimize", function (event) {
@@ -89,29 +104,53 @@ function createWindow() {
   });
 
   mainWindow.setMaximizable(false);
+  mainWindow.on("close", async function (event) {
+    if (!app.isQuiting) {
+      event.preventDefault();
+      mainWindow.hide();
+    }
+  });
 
-  appIcon.on("double-click", function (event) {
+  appIcon.on("double-click", function () {
     mainWindow.show();
   });
 }
 
+ipcMain.on("main-window-ready", async (event) => {
+  const listOfPrint = await mainWindow.webContents.getPrinters();
+  console.log("listOfPrint :>> ", listOfPrint);
+  event.sender.send("get-print-driver", listOfPrint);
+});
+// get  list print driver
+
+ipcMain.on("list-print-driver", async () => {
+  const listOfPrint = mainWindow.webContents.getPrinters();
+  mainWindow.webContents.send(listOfPrint);
+  // console.log('listOfPrint :>> ', listOfPrint);
+  // return listOfPrint
+  // mainWindow.webContents.send("""aaaa");
+});
+
+//notification
+ipcMain.on("send-notification", (_, content) => {
+  showNotification(content);
+});
+
+// send content to print screen
 ipcMain.on("print", (event, content) => {
   if (printWindow) {
     console.log("print 1");
-
     printWindow.webContents.send("print", content);
   }
 });
 
-ipcMain.on("readyToPrint", (event) => {
-  console.log("readyToPrint");
-  const getList = printWindow.webContents.getPrinters();
-  console.log("getList",getList);
+// print here
+ipcMain.on("readyToPrint", (event, content) => {
   try {
     if (printWindow) {
       setTimeout(() => {
         printWindow.webContents.print(
-          {},
+          { deviceName: content, silent: true },
           // { silent: true },
           (success, errorType) => {
             if (!success) {
@@ -134,6 +173,7 @@ ipcMain.on("readyToPrint", (event) => {
 });
 
 app.on("ready", createWindow);
+
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
