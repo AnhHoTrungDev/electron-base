@@ -1,11 +1,23 @@
 import React, { useState, useEffect } from "react";
 import { print } from "@common/print";
 import { Select } from "antd";
+import { useQuery, gql } from "@apollo/client";
+
 const { ipcRenderer } = window.require("electron");
+
+const GET_USER = gql`
+  query  {
+    hello
+  }
+`;
 
 const { Option } = Select;
 
 const ListPrint = () => {
+  const { loading, error, data } = useQuery(GET_USER);
+
+  console.log("query :>> ", { loading, error, data });
+
   const [listOfPrintDriver, setListOfPrintDriver] = useState([]);
   const [printName, setPrintName] = useState("");
   const handleChangePrint = (value) => {
@@ -21,8 +33,6 @@ const ListPrint = () => {
       console.log("content :>> ", content);
     });
   }, []);
-
-  console.log("handleChangePrint value", printName);
 
   return (
     <div className="App">
