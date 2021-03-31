@@ -1,22 +1,58 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { print } from "@common/print";
 import { Select } from "antd";
-import { useQuery, gql } from "@apollo/client";
+import { useMutation, gql, useSubscription } from "@apollo/client";
 
 const { ipcRenderer } = window.require("electron");
 
-const GET_USER = gql`
-  query  {
-    hello
+const UPDATE_PRINT = gql`
+  mutation updatePrint($idRoom:String,$input:[PrintInfoInput]){
+    updatePrint(idRoom:$idRoom,input:$input)
   }
-`;
+`
+const ACTION_SUB = gql` 
+  subscription getAction($idRoom: String){
+    getAction(idRoom:$idRoom){
+      getPrints
+      printPayload{
+        content
+        printName
+      }
+    }
+  }
+`
 
 const { Option } = Select;
 
 const ListPrint = () => {
-  const { loading, error, data } = useQuery(GET_USER);
+  const [updatePrint, { data: abc }] = useMutation(UPDATE_PRINT);
 
-  console.log("query :>> ", { loading, error, data });
+  const { data: dataSub, loading, error } = useSubscription(ACTION_SUB, { variables: { idRoom: "abc" } })
+
+  console.log({dataSub, loading, error})
+
+  if (dataSub?.getAction) {
+    const { getPrints, printPayload } = dataSub.getAction
+    if (printPayload) {
+      const { content, printName } = printPayload
+      if (content) {
+        print(content, printName)
+      }
+    }
+
+    if (getPrints) {
+      senPrints()
+    }
+  }
+
+  // if (data?.getAction?.print) {
+  //   console.log("run >>top  print")
+  //   const printData = data?.getAction?.print
+  //   if (printData?.content && printData?.printName) {
+  //     console.log("run >> print")
+  //     print(printData?.content, printData?.printName)
+  //   }
+  // }
 
   const [listOfPrintDriver, setListOfPrintDriver] = useState([]);
   const [printName, setPrintName] = useState("");
@@ -25,14 +61,28 @@ const ListPrint = () => {
     setPrintName(value);
   };
 
-  useEffect(() => {
+  const senPrints = useCallback(() => {
     ipcRenderer.send("main-window-ready");
 
     ipcRenderer.on("get-print-driver", (_, content) => {
       setListOfPrintDriver(content);
       console.log("content :>> ", content);
-    });
+
+      const input = content.map((print) => {
+        const { name } = print
+        return { name }
+      })
+
+      updatePrint({
+        variables: { idRoom: "abc", input }
+      })
+    })
+
   }, []);
+
+  useEffect(() => {
+    senPrints()
+  }, [])
 
   return (
     <div className="App">
